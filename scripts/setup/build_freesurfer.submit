@@ -1,0 +1,18 @@
+# The environment
+universe       = vanilla
+getenv         = True
+request_cpus   = 1
+request_memory = 8G
+request_disk   = 100G
+
+
+# Execution
+initialdir = $(ENV(PROJECT_DIR))
+executable = /usr/bin/singularity
+
+# Job
+arguments = build $(ENV(SINGULARITY_DIR))/freesurfer-7.1.1.simg docker://freesurfer/freesurfer:7.1.1
+log       = logs/build_freesurfer_$(Cluster).$(Process).log
+output    = logs/build_freesurfer_$(Cluster).$(Process).out
+error     = logs/build_freesurfer_$(Cluster).$(Process).err
+Queue

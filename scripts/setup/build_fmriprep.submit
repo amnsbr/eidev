@@ -1,0 +1,18 @@
+# The environment
+universe       = vanilla
+getenv         = True
+request_cpus   = 1
+request_memory = 8G
+request_disk   = 100G
+
+
+# Execution
+initialdir = $(ENV(PROJECT_DIR))
+executable = /usr/bin/singularity
+
+# Job
+arguments = build $(ENV(SINGULARITY_DIR))/fmriprep-22.0.0.simg docker://nipreps/fmriprep:22.0.0
+log       = logs/build_fmriprep_$(Cluster).$(Process).log
+output    = logs/build_fmriprep_$(Cluster).$(Process).out
+error     = logs/build_fmriprep_$(Cluster).$(Process).err
+Queue

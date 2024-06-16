@@ -1,0 +1,12 @@
+results/set_env.py
+results/create_symlinks.sh
+# private data
+results/*.csv
+results/*.pkz
+# but allow public (p_) data
+!results/p_*
+venv
+.ipynb_checkpoints/
+__pycache__/
+*.dag
+*.dag.*

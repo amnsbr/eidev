@@ -1,0 +1,27 @@
+The structure of the scripts and their usage:
+- `setup`:
+    - `bash setup_venv.sh`: Sets up the Python enviornment and installs some dependencies
+    - `condor_submit build_*.submit`: Build Singularity container image of FreeSurfer, fMRIPrep and Micapipe
+- `proc_anat`: Processes T1w images using FreeSurfer
+    - `bash get_submit.sh <dataset> [<n>]`: Generates condor job instructions to run FreeSurfer on `<n>` (default: all the remaining) subjects of `<dataset>`. The jobs can be run by feeding the printed instruction to `condor_submit` via `bash get_submit.sh <dataset> [<n>] | condor_submit`.
+    - `bash run_freesurfer.sh <dataset> <subject_id>`: Runs FreeSurfer (through Singularity) on a given subject
+- `proc_rest`: Processes the rs-fMRI data and creates functional connectivity and functional connectivity dynamics matrices
+    - `bash gen_submit.sh <dataset> [<n> <cpus=1> <skip_excluded=true>]`: Generates condor job instructions to run `proc_rest.sh` on `<n>` (default: all the remaining) subjects of `<dataset>`. The jobs can be run by feeding the printed instruction to `condor_submit` via `bash get_submit.sh <dataset> [<n> <cpus=1> <skip_excluded=true>] | condor_submit`.
+    - `bash proc_rest.sh <dataset> <subject_id> [<cpus=1>]`: Runs fMRIPrep (through singularity) and post-processing of its output (`post_fmriprep.py`) on a given subject.
+    - `python post_fmriprep.py <dataset> <subject_id> [<session>]`: Runs post-processing of fMRIprep output including parcellation, cleaning and calculation of FC and FCD. It is run as part of `proc_rest.sh`.
+- `proc_dwi`: Processes the dwi data (and anatomical data, as required by Micapipe) and creates structural connectivity strength and length matrices.
+    - `bash gen_submit.sh <dataset> [<n> <cpus=1> <skip_excluded=true>]`: Generates condor job instructions to run `proc_dwi.sh` on `<n>` (default: all the remaining) subjects of `<dataset>`. The jobs can be run by feeding the printed instruction to `condor_submit` via `bash get_submit.sh <dataset> [<n> <cpus=1> <skip_excluded=true>] | condor_submit`.
+    - `bash proc_dwi.sh <dataset> <subject_id>`: Runs DWI and T1w processing of Micapipe (through singularity) as well as post-processing of its output (`post_micapipe.py`) on a given subject.
+    - `python post_micapipe.py <dataset> <subject_session_id>`: Runs post-processing of micapipe output which includes labeling and normalization of the SC matrices.
+- `group`: Group-pooling of the structural and functional connectivity data.
+    - `python group_fc.py <dataset> <fc_file_prefix> [<group_name> <sub1> <sub2> ...]`: Pools specified FC and FCD data of a group of subjects. If no `group_name` and list of subjects are provided will group all the available subjects.
+    - `python group_sc.py <dataset> [<group_name> <sub1> <sub2> ...]`: Pools SC strength and length data of a group of subjects. If no `group_name` and list of subjects are provided will group all the available subjects.
+- `modeling`: Biophysical network modeling.
+    - `run/`: Runs BNM simulation-optimizations and other simulation experiments. See [`./modeling/run/`](modeling/run/) for details.
+    - `check_fit.py`: Loads the `bnm_cuda` CMAES and simulation outputs and processes them for the statistical analyses.
+- `utils`: A module that can be imported by other scripts and includes utility functions for:
+    - `datasets.py`: Load data (e.g. the six maps).
+    - `plot.py`: Plotting functions.
+    - `stats.py`: Statistical functions.
+    - `transform.py`: Parcellation and deparcellation.
+- `src`: Includes the parcellation, templates and PET images of NMDA and GABA_A. Source of each file is described in [`./src/`](src/).

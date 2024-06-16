@@ -1,0 +1,9 @@
+[submodule "tools/bnm_cuda"]
+	path = tools/bnm_cuda
+	url = https://github.com/amnsbr/bnm_cuda.git
+[submodule "tools/cubnm"]
+	path = tools/cubnm
+	url = https://github.com/amnsbr/cubnm.git
+[submodule "tools/laminar_organization"]
+	path = tools/laminar_organization
+	url = https://github.com/amnsbr/laminar_organization.git
