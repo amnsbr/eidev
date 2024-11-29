@@ -100,7 +100,6 @@ def load_cmaes(
     sims_dir,
     params,
     het_params,
-    maps_path,
     emp_fc_tril,
     emp_fcd_tril,
     n_vols_remove,
@@ -109,6 +108,7 @@ def load_cmaes(
     itMax=81,
     lmbda=210,
     SeedMW=1,
+    SeedSim=410,
     fc_prefix="ctx_parc-schaefer-100_hemi-LR_highpass-013_lowpass-none_exc-inter",
     nodes=100,
     exc_interhemispheric=True,
@@ -125,8 +125,6 @@ def load_cmaes(
         with keys "G", "wee", "wei", and "wie"
     het_params: (str)
         heterogeneity parameters separated by "-"
-    maps_path: (str)
-        path to the heterogeneity maps .txt file
     emp_fc_tril: (np.ndarray)
     emp_fcd_tril: (np.ndarray)
     n_vols_remove: (int)
@@ -140,6 +138,8 @@ def load_cmaes(
         number of CMAES particles
     SeedMW: (int)
         random seed of CMAES
+    SeedSim: (int)
+        random seed of simulation
     fc_prefix: (str)
         FC(D) filename prefix
     nodes: (int)
@@ -156,7 +156,7 @@ def load_cmaes(
         mean state variables
     """
     params = copy.deepcopy(params)
-    prefix = f'{fc_prefix}_G_{params["G"]}_wee_{params["wee"]}_wei_{params["wei"]}_wie_{params["wie"]}_het-{het_params}_SeedMW-{SeedMW}_SeedSim-410_n-{itMax}x{lmbda}'
+    prefix = f'{fc_prefix}_G_{params["G"]}_wee_{params["wee"]}_wei_{params["wei"]}_wie_{params["wie"]}_het-{het_params}_SeedMW-{SeedMW}_SeedSim-{SeedSim}_n-{itMax}x{lmbda}'
     cmaes_log_path = os.path.join(cmaes_dir, f"{prefix}.txt")
     if not (os.path.exists(cmaes_log_path)):
         print(f"{cmaes_log_path} does not exist")
@@ -214,36 +214,16 @@ def load_cmaes(
     )
     with open(os.path.join(sims_dir, f"{prefix}_fic_ntrials.txt"), "r") as f:
         res["fic_ntrials"] = int(f.read().split(" ")[0])
-    # parameter maps
-    maps = np.loadtxt(maps_path)
+    # parameters and average states
     regional_vars = {}
-    for par in het_params.split("-"):
-        # bias
-        regional_vars[par] = np.repeat(res[par], nodes)
-        # scaled maps
-        for map_idx in range(maps.shape[0]):
-            regional_vars[par] += maps[map_idx, :] * res[f"{par}scale_{map_idx}"]
-        # min = 0.001
-        regional_vars[par] = regional_vars[par] - (regional_vars[par].min() - 0.001)
-    regional_vars["wie"] = pd.read_csv(
-            os.path.join(sims_dir, f"{prefix}_w_IE.txt"),
-            delim_whitespace=True,
-            header=None,
-        ).squeeze().values
-    for var in ["I_E", "r_E", "S_E", "I_I", "r_I", "S_I"]:
+    for var in ["I_E", "r_E", "S_E", "I_I", "r_I", "S_I", "w_EE", "w_EI", "w_IE"]:
         regional_vars[var] = pd.read_csv(
                 os.path.join(sims_dir, f"{prefix}_{var}.txt"),
                 delim_whitespace=True,
                 header=None,
             ).squeeze().values
-        if regional_vars[var].ndim == 2:  # cpu output
-            regional_vars[var] = regional_vars[var].mean(axis=0)
     regional_vars = pd.DataFrame(regional_vars)
-    mean_regional_vars = regional_vars.mean()
-    mean_regional_vars.index = "mean_" + mean_regional_vars.index
-    res.update(mean_regional_vars.to_dict())
     return res, regional_vars
-
 
 def load_cmaes_hist(
     cmaes_dir,

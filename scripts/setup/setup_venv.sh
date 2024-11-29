@@ -9,3 +9,7 @@ fi
 
 source venv/bin/activate
 pip install -r ${PROJECT_DIR}/scripts/setup/requirements.txt
+
+# install cubnm
+export CUBNM_NOISE_WHOLE=1
+pip install git+https://github.com/amnsbr/cuBNM@be473d471ff4aa8bf92b8971b075a2d265adb1b5 -vvv

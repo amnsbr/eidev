@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import scipy
 import brainspace.mesh
 import brainspace.plotting
 import surfplot
@@ -8,7 +9,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import seaborn as sns
 import pyvirtualdisplay
 
-from . import datasets
+from . import datasets, transform, stats
 
 
 def plot_surface(
@@ -21,6 +22,7 @@ def plot_surface(
     cmap="viridis",
     vrange=None,
     cbar=False,
+    cbar_kwargs={},
     nan_color=(0.85, 0.85, 0.85, 1),
     as_outline=False,
     plotter="brainspace",
@@ -57,6 +59,9 @@ def plot_surface(
         only used with surfplot
     plotter: {'brainspace', 'surfplot'}
     **plotter_kwargs
+        kwargs passed to plotter
+    **cbar_kwargs
+        kwargs passed to colorbar plotter
     """
     if isinstance(cmap, str):
         cmap = [cmap]
@@ -106,7 +111,7 @@ def plot_surface(
         vrange = (vmin, -vmin)
     if cbar:
         for c in cmap:
-            plot_colorbar(vrange[0], vrange[1], c)
+            plot_colorbar(vrange[0], vrange[1], c, **cbar_kwargs)
     # create virtual display for plotting in remote servers
     disp = pyvirtualdisplay.Display(visible=False)
     disp.start()
@@ -185,7 +190,6 @@ def plot_colorbar(
     cax.xaxis.tick_bottom()
     return fig
 
-
 def plot_dynamic_fc(window_fcs, output_path):
     """
     Creates a movie of dynamic FC
@@ -209,3 +213,164 @@ def plot_dynamic_fc(window_fcs, output_path):
         plt.close(fig)
         images.append(imageio.imread(tmp_img_path))
     imageio.mimsave(output_path, images, fps=5)
+
+def reg_plot(
+    X, Y, parcellation_name, n_perm=1000,
+    xlabel='', ylabel='', metrics=['pearson', 'cosine'],
+    ax=None,
+):
+    """
+    Performs spin test between X and Y using `tests` and 
+    reports them on a regression plot.
+
+    Parameters
+    ----------
+    X, Y: (np.ndarray)
+        arrays to be compared
+    parcellation_name: (str)
+    n_perm: (int)
+    xlabel, ylabel: (str)
+    metrics: (list)
+        - 'pearson': Pearson correlation
+        - 'cosine': Cosine similarity
+    ax: (`matplotlib.axes.Axes`)
+        if None, a new figure is created
+    
+    Returns
+    -------
+    ax: (`matplotlib.axes.Axes`)
+    """
+    # stats
+    statistics = {}
+    ps = {}
+    if 'pearson' in metrics:
+        statistics['pearson'], ps['pearson'], _ = stats.spin_test_parcellated(
+            X, Y, parcellation_name, n_perm=n_perm,
+            method='pearson'
+        )
+        print("Correlation coefficient:", statistics['pearson'].iloc[0, 0], "; p-vlaue:", ps['pearson'].iloc[0, 0])
+    if 'cosine' in metrics:
+        statistics['cosine'], ps['cosine'], _ = stats.spin_test_parcellated(
+            X, Y, parcellation_name, n_perm=n_perm, 
+            method=lambda a, b: 1 - scipy.spatial.distance.cosine(a, b)
+        )
+        print("Cosine similarity:", statistics['cosine'].iloc[0, 0], "; p-vlaue:", ps['cosine'].iloc[0, 0])
+    # plot
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(3.5,2.8))
+    sns.regplot(
+        x=X, 
+        y=Y, 
+        scatter_kws=dict(color='#44546A', alpha=1, s=10), 
+        line_kws=dict(color='#44546A'), 
+        ax=ax
+    )
+    text = ''
+    if 'pearson' in metrics:
+        text += f"r = {statistics['pearson'].iloc[0,0]:.3f} "
+        if ps['pearson'].iloc[0,0] > 0.001:
+            text += f"(p = {ps['pearson'].iloc[0,0]:.3f})"
+        else:
+            text += '(p < 0.001)'
+        if ps['pearson'].iloc[0,0] < 0.05:
+            text+=r'$^*$'
+        text += '\n'
+    if 'cosine' in metrics:
+        text += f"cos = {statistics['cosine'].iloc[0,0]:.3f} "
+        if ps['cosine'].iloc[0,0] > 0.001:
+            text += f"(p = {ps['cosine'].iloc[0,0]:.3f})"
+        else:
+            text += '(p < 0.001)'
+        if ps['cosine'].iloc[0,0] < 0.05:
+            text+=r'$^*$'
+    text = text.replace('p', r'p$_{spin}$')
+    text_x = ax.get_xlim()[0]+(ax.get_xlim()[1]-ax.get_xlim()[0])*0.05
+    text_y = ax.get_ylim()[0]+(ax.get_ylim()[1]-ax.get_ylim()[0])*1
+    ax.text(text_x, text_y, text,
+            color='black',size=16,
+            multialignment='left')
+    ax.set_xlabel(xlabel, fontdict=dict(fontsize=20))
+    ax.set_ylabel(ylabel, fontdict=dict(fontsize=20))
+    sns.despine()
+    return ax
+
+def plot_icc(icc, parcellation_name):
+    """
+    Plots ICC distribution and surface map
+
+    Parameters
+    ----------
+    icc: (pd.Series)
+        intraclass correlation coefficients across parcels
+        Shape: (n_parcels,)
+    parcellation_name: (str)
+    """
+    fig, ax = plt.subplots(figsize=(4, 0.5))
+    sns.swarmplot(
+        x=icc,
+        s=3, color='#44546A',
+        ax=ax
+    )
+    sns.boxplot(
+        x=icc,
+        showfliers=False,
+        showcaps=False, width=0.1,
+        boxprops={"facecolor": (1, 1, 1, 0.75)},
+        ax=ax)
+    ax.set_yticks([])
+    ax.set_xlim([-1, 1])
+    ax.set_xlabel('Intraclass correlation coefficient')
+    sns.despine()
+    plt.setp(ax.collections, zorder=0, label="")
+    
+    return plot_surface(
+        transform.deparcellate_surf(icc, parcellation_name, concat=True, space='fsaverage'), 
+        'fsaverage', mesh_kind='semi-inflated',
+        cmap='magma', cbar=True, vrange=(icc.min().round(2), icc.max().round(2)),
+        cbar_kwargs=dict(figsize=(2,2)),
+        layout_style='row'
+    )
+
+def plot_icc_by_age(icc_by_age, parcellation_name):
+    """
+    Plots ICC distribution (in all, versus younger and older age groups)
+    as well as surface map of ICC across all subjects
+
+    Parameters
+    ----------
+    icc_by_age: (pd.DataFrame)
+        intraclass correlation coefficients across parcels and age groups
+        Shape: (n_parcels, 3)
+        Columns: 'all', 'younger', 'older'
+    parcellation_name: (str)
+    """
+    t, p = scipy.stats.ttest_rel(icc_by_age['younger'], icc_by_age['older'])
+    print(f'T ={t}, p = {p}')
+    plot_data = icc_by_age.unstack().reset_index()
+    plot_data['level_0'] = plot_data['level_0'].str.title()
+    fig, ax = plt.subplots(figsize=(4, 0.85))
+    sns.boxplot(
+        data=plot_data,
+        x=0,
+        hue='level_0',
+        showfliers=False,
+        showcaps=False, width=0.6,
+        palette=['lightgrey', 'darkgrey', 'grey'],
+        ax=ax,
+        legend=True
+    )
+    ax.legend(loc='center left', fontsize=10, frameon=False)
+    ax.set_yticks([])
+    ax.set_xlim([-1, 1])
+    ax.set_xlabel('Intraclass correlation coefficient')
+    sns.despine()
+    plt.setp(ax.collections, zorder=0, label="")
+    if p < 0.05:
+        ax.text(plot_data[0].max()+0.1, -0.125, '|*', va='center', ha='left', color='grey', fontsize=20)
+    return plot_surface(
+        transform.deparcellate_surf(icc_by_age['all'], parcellation_name, concat=True, space='fsaverage'), 
+        'fsaverage', mesh_kind='semi-inflated',
+        cmap='magma', cbar=True, vrange=(icc_by_age['all'].min().round(2), icc_by_age['all'].max().round(2)),
+        cbar_kwargs=dict(figsize=(2,2)),
+        layout_style='row'
+    )

@@ -5,7 +5,11 @@ results/*.csv
 results/*.pkz
 # but allow public (p_) data
 !results/p_*
-venv
+# results subfolders
+results/*/*
+# misc.
+venv/
+logs/
 .ipynb_checkpoints/
 __pycache__/
 *.dag

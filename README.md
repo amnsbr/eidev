@@ -1,11 +1,11 @@
 # Adolescent development of E-I using biophysical network modeling
-This repository includes the code associated with the paper "Adolescent maturation of cortical excitation-inhibition balance based on individualized biophysical network modeling", Saberi et al.
+This repository includes the code associated with the paper "Adolescent maturation of cortical excitation-inhibition ratio based on individualized biophysical network modeling", Saberi et al.
 
 ## Structure
 - `scripts`: Scripts used for image preprocessing and running biophysical network modeling simulation-optimization jobs. Read the details in [`./scripts/`](scripts/).
 - `tools`: Software developed in this project for biophysical network modeling simulation-optimization on GPU and CPU
     - [`bnm_cuda`](https://github.com/amnsbr/bnm_cuda): Main C++/CUDA used for model simulation-optimization
-    - [`cuBNM`](https://github.com/amnsbr/cuBNM): A Python toolbox containing a similar C++/CUDA core that was used in some of the analyses
+    - [`cubnm`](https://github.com/amnsbr/cubnm): A Python toolbox containing a similar C++/CUDA core that was used in some of the analyses
 - `results`: Jupyter notebooks and helper scripts used to run statistical tests and generate the paper main and supplementary figures. Note that these notebooks cannot be run without the input data which is restricted-access and cannot be shared publicly. However, some of the data such as the maps of statistical effects are shared within this folder.
 
 ## Dependencies
@@ -17,8 +17,8 @@ This repository includes the code associated with the paper "Adolescent maturati
     - [<img src="https://img.shields.io/badge/docker-micalab/micapipe:v0.1.2-blue.svg?logo=docker">](https://hub.docker.com/layers/micalab/micapipe/v0.1.2/images/sha256-b2f94d47c9810105cf020fc0deda6c1b51eeddd1444593963612ba5c7d9a3cfd?context=explore): Note that we used an earlier version (0.1.1) which is currently not available on Docker Hub.
 - `scripts/modeling/run` scripts require Nvidia GPUs and a few additional dependencies:
     - `scripts/modeling/run/bnm_cuda`: See [here](https://github.com/amnsbr/bnm_cuda?tab=readme-ov-file#build-dependencies)
-    - `scripts/modeling/run/cuBNM`: Additionally requires `cuBNM` to be installed in the Python virtual environment (not installed via `./scripts/setup/requirements.txt`). For `cuBNM` requirements see [here](https://github.com/amnsbr/cuBNM/tree/main?tab=readme-ov-file#installation)
+    - `scripts/modeling/run/cubnm`: Additionally requires `cubnm` to be installed in the Python virtual environment (not installed via `./scripts/setup/requirements.txt`). For `cubnm` requirements see [here](https://cubnm.readthedocs.io/en/latest/install.html)
 - The preprocessing and modeling scripts were run as jobs on our HTC and HPC clusters which use HTCondor and Slurm for job scheduling, respectively.
 
 ## Support
-Feel free to contact me (amnsbr\[at\]gmail.com, a.saberi\[at\]fz-juelich.de, saberi\[at\]cbs.mpg.de) if you have any questions.
+Feel free to contact Amin Saberi (amnsbr\[at\]gmail.com) if you have any questions.

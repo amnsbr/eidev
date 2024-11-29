@@ -1,5 +1,4 @@
 import os
-import re
 import numpy as np
 import pandas as pd
 import scipy.stats
@@ -9,139 +8,10 @@ import nilearn.surface
 import nilearn.signal
 from nilearn.input_data import NiftiLabelsMasker
 import neuromaps
-import brainstat.context.meta_analysis
-import brainstat._utils
 
 CODE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 SRC_DIR = os.path.join(CODE_DIR, "src")
 from . import transform
-
-# list cognitive and behavioral terms based on Hansen 2022
-COGNITIVE_TERMS = [
-    "action",
-    "adaptation",
-    "addiction",
-    "anticipation",
-    "anxiety",
-    "arousal",
-    "association",
-    "attention",
-    "autobiographical memory",
-    "balance",
-    "belief",
-    "categorization",
-    "cognitive control",
-    "communication",
-    "competition",
-    "concept",
-    "consciousness",
-    "consolidation",
-    "context",
-    "coordination",
-    "decision",
-    "decision making",
-    "detection",
-    "discrimination",
-    "distraction",
-    "eating",
-    "efficiency",
-    "effort",
-    "emotion",
-    "emotion regulation",
-    "empathy",
-    "encoding",
-    "episodic memory",
-    "expectancy",
-    "expertise",
-    "extinction",
-    "face recognition",
-    "facial expression",
-    "familiarity",
-    "fear",
-    "fixation",
-    "focus",
-    "gaze",
-    "goal",
-    "hyperactivity",
-    "imagery",
-    "impulsivity",
-    "induction",
-    "inference",
-    "inhibition",
-    "insight",
-    "integration",
-    "intelligence",
-    "intention",
-    "interference",
-    "judgment",
-    "knowledge",
-    "language",
-    "language comprehension",
-    "learning",
-    "listening",
-    "localization",
-    "loss",
-    "maintenance",
-    "manipulation",
-    "meaning",
-    "memory",
-    "memory retrieval",
-    "mental imagery",
-    "monitoring",
-    "mood",
-    "morphology",
-    "motor control",
-    "movement",
-    "multisensory",
-    "naming",
-    "navigation",
-    "object recognition",
-    "pain",
-    "perception",
-    "planning",
-    "priming",
-    "psychosis",
-    "reading",
-    "reasoning",
-    "recall",
-    "recognition",
-    "rehearsal",
-    "reinforcement learning",
-    "response inhibition",
-    "response selection",
-    "retention",
-    "retrieval",
-    "reward anticipation",
-    "rhythm",
-    "risk",
-    "rule",
-    "salience",
-    "search",
-    "selective attention",
-    "semantic memory",
-    "sentence comprehension",
-    "skill",
-    "sleep",
-    "social cognition",
-    "spatial attention",
-    "speech perception",
-    "speech production",
-    "strategy",
-    "strength",
-    "stress",
-    "sustained attention",
-    "task difficulty",
-    "thought",
-    "uncertainty",
-    "updating",
-    "utility",
-    "valence",
-    "verbal fluency",
-    "visual attention",
-    "visual perception",
-    "word recognition",
-    "working memory",
-]
 
 
 def load_pet_map(receptor, parc, zscore=True):
@@ -442,44 +312,3 @@ def load_aggregate_gene_expression(gene_list, parcellation_name, avg_method="mea
     elif avg_method == "median":
         aggregate_expression = ahba_data.loc[:, gene_list.index].median(axis=1)
     return aggregate_expression
-
-
-def load_neurosynth(parcellation_name, selected_terms="cognitive"):
-    """
-    Loads Neurosynth meta-analytical maps and parcellates them.
-
-    This function is adapted from BrainStat (https://github.com/MICA-MNI/BrainStat)
-    and uses its data.
-
-    Parameters
-    ----------
-    parcellation_name: (str)
-    selected_terms: (list or str)
-        - []: all terms
-        - list of str
-        - 'cognitive': terms obtained from Hansen 2022 Nat Neuro
-
-    Returns
-    -------
-    features_parc: (pd.DataFrame)
-    """
-    if selected_terms == "cognitive":
-        selected_terms = COGNITIVE_TERMS
-    data_dir = brainstat._utils.data_directories["NEUROSYNTH_DATA_DIR"]
-    data_dir.mkdir(exist_ok=True, parents=True)
-    feature_files = tuple(
-        brainstat.context.meta_analysis._fetch_precomputed(
-            data_dir, database="neurosynth"
-        )
-    )
-    selected_feature_files = {}
-    # aggregate selected images into a 4D nifti
-    for i in range(len(feature_files)):
-        feature_name = re.search("__[A-Za-z0-9 ]+", feature_files[i].stem)[0][2:]  # type: ignore
-        if (len(selected_terms) == 0) or (feature_name in selected_terms):
-            selected_feature_files[feature_name] = feature_files[i]
-    img_4d = nilearn.image.concat_imgs(list(selected_feature_files.values()))
-    # parcellated the 4D nifti
-    parc_features = transform.parcellate_vol(img_4d, parcellation_name, concat=True)
-    parc_features.columns = list(selected_feature_files.keys())
-    return parc_features

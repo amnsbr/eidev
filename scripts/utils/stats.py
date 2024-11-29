@@ -1,15 +1,33 @@
+import os
+import time
+import itertools
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 import scipy.stats
-import itertools
 import requests
 import nilearn.surface
 import nilearn.plotting
 import enigmatoolbox.permutation_testing
 from sklearn.cross_decomposition import PLSRegression
+import statsmodels
 from tqdm import tqdm
 
 from . import datasets, transform
+
+DSEA_STAGES = [
+    "Early Fetal",
+    "Early Mid Fetal",
+    "Late Mid Fetal",
+    "Late Fetal",
+    "Neotal Early Infancy",
+    "Late Infancy",
+    "Early Childhood",
+    "Middle Late Childhood",
+    "Adolescence",
+    "Young Adulthood",
+]
 
 
 def get_rotated_parcels(
@@ -19,7 +37,7 @@ def get_rotated_parcels(
     return_indices=True,
     space="fsaverage",
     downsampled=True,
-    seed=921,
+    seed=0,
 ):
     """
     Uses ENIGMA Toolbox approach to spin parcel centroids on the cortical sphere instead
@@ -84,7 +102,7 @@ def get_rotated_parcels(
 
 
 def spin_test_parcellated(
-    X, Y, parcellation_name, n_perm=1000, space="fsaverage", seed=921
+    X, Y, parcellation_name, n_perm=1000, space="fsaverage", seed=0, method="pearson",
 ):
     """
     Uses ENIGMA Toolbox approach to spin parcel centroids on the cortical sphere instead
@@ -98,12 +116,14 @@ def spin_test_parcellated(
     n_perm: (int)
     space: {'fsaverage'}
     seed: (int)
+    method: {'pearson', 'kendall', 'spearman'} or callable
+        passed on to `pandas.DataFrame.corr`
     """
     # calculate test correlation coefficient between all pairs of columns between surface_data_to_spin and surface_data_target
     coefs = (
         pd.concat([X, Y], axis=1)
         # calculate the correlation coefficient between all pairs of columns within and between X and Y
-        .corr()
+        .corr(method=method)
         # select only the correlations we are interested in
         .iloc[: X.shape[1], -Y.shape[1] :]
         # convert it to shape (1, n_features_Y, n_features_surface_X)
@@ -154,7 +174,7 @@ def spin_test_parcellated(
         surrogates.columns = [f"surrogate_{i}" for i in range(n_perm)]
         null_distribution[:, :, x_col] = (
             pd.concat([surrogates, Y_all_parcels.reset_index(drop=True)], axis=1)
-            .corr()
+            .corr(method=method)
             .iloc[: surrogates.shape[1], -Y.shape[1] :]
             .values
         )
@@ -165,7 +185,6 @@ def spin_test_parcellated(
     pvals = pd.DataFrame(pvals, index=Y.columns, columns=X.columns)
     coefs = pd.DataFrame(coefs, index=Y.columns, columns=X.columns)
     return coefs, pvals, null_distribution
-
 
 def anova(parc_data, categories, output="text", force_posthocs=False):
     """
@@ -214,7 +233,6 @@ def anova(parc_data, categories, output="text", force_posthocs=False):
         return anova_res_str
     else:
         return anova_res
-
 
 def anova_spin(parc_data, categories, parcellation_name, n_perm=1000, seed=921):
     """
@@ -318,10 +336,11 @@ def ahba_pls(parcellated_data, parcellation_name='schaefer-100', n_genes=500, n_
         top_genes.append({'pos': top_pos, 'neg': top_neg})
     return top_genes, pls
 
-def run_csea_developmental(gene_list, fdr=True, mirror='new'):
+def fetch_dsea_results(gene_list, fdr=True, mirror='new'):
     """
     Runs CSEA tool developmental enrichment on the gene list 
-    using http://doughertylab.wustl.edu/csea-tool-2/
+    using http://doughertylab.wustl.edu/csea-tool-2/, parses
+    and cleans the results table and returns it
 
     Parameters
     ---------
@@ -358,3 +377,238 @@ def run_csea_developmental(gene_list, fdr=True, mirror='new'):
     else:
         csea_res = csea_res.applymap(lambda c: (c.split('(')[0])).astype('float')
     return csea_res
+
+def dsea(
+    X, parcellation_name, seed=0, n_genes=500,
+    mirror='new', pSI='0.05', fdr=True
+):
+    """
+    Performs developmentla specific expression analysis (dSEA) on the
+    provided parcellated map
+
+    Parameters
+    ---------
+    X: (pd.DataFrame)
+    parcellation_name: (str)
+    seed: (int)
+        Seed used for PLS
+    n_genes: (int)
+        Number of top genes to select
+    mirror: {'new', 'old', str}
+        CSEA tool url
+    pSI: specificity index threshold
+    fdr: (bool)
+        apply FDR correction on p-values
+
+    Returns
+    -------
+    nlog_dsea_res: (pd.Series)
+        negative log10 of p-values
+    raw_dsea_res: (dict)
+        raw results
+    top_genes: (list of dict)
+        top genes from PLS with 'pos' and 'neg' weights
+    pls: (sklearn.cross_decomposition.PLSRegression)
+        fitted PLS model
+    """
+    # run PLS and get the top associated genes
+    np.random.seed(seed)
+    top_genes, pls = ahba_pls(X, parcellation_name=parcellation_name, n_genes=n_genes, n_components=1)
+    # make sure 'pos' genes correspond to genes with *higher* expression
+    # towards regions with *higher* values in X
+    # therefore when y weight is negative switch positive and negative
+    if pls.y_weights_[0] < 0:
+        top_genes[0] = {
+            "pos": top_genes[0]["neg"],
+            "neg": top_genes[0]["pos"],
+        }
+    # run online CSEA tool on the positive and negative lists of genes
+    pos_res = fetch_dsea_results(top_genes[0]["pos"], fdr=False, mirror=mirror)
+    time.sleep(2)  # to avoid back-to-back requests to the online tool
+    neg_res = fetch_dsea_results(top_genes[0]["neg"], fdr=False, mirror=mirror)
+    raw_dsea_res = {"Positive": pos_res, "Negative": neg_res}
+    # filter to cortex, apply FDR on cortex p-values and take negative log10
+    nlog_dsea_res = {}
+    fdr_sigs = {}
+    for k, dsea_res in raw_dsea_res.items():
+        dsea_res = dsea_res.copy()
+        # select pSI threshold
+        dsea_res = dsea_res.loc[:, [pSI]]
+        # clean structure and stages names
+        dsea_res["Structure"] = dsea_res.index.to_series().apply(
+            lambda s: s.split(".")[0].strip()
+        )
+        dsea_res["Stage"] = dsea_res.index.to_series().apply(
+            lambda s: " ".join(s.split(".")[1:])
+        )
+        dsea_res["Stage"] = dsea_res["Stage"].str.strip()
+        dsea_res = (
+            dsea_res.reset_index(drop=True)
+            .set_index(["Stage", "Structure"])["0.05"]
+            .unstack()
+        )
+        # select cortex and order stages
+        dsea_res = dsea_res.loc[DSEA_STAGES, "Cortex"]
+        # FDR if indicated
+        if fdr:
+            fdr_sig, p_fdr = statsmodels.stats.multitest.fdrcorrection(dsea_res.values)
+            dsea_res.iloc[:] = p_fdr
+            fdr_sigs[k] = fdr_sig
+        # take negative log10 of p-values
+        dsea_res = -np.log10(dsea_res)
+        nlog_dsea_res[k] = dsea_res
+    # convert the results to a stacked series
+    nlog_dsea_res = pd.DataFrame(nlog_dsea_res).stack()
+    return nlog_dsea_res, raw_dsea_res, top_genes, pls
+
+def dsea_plot(
+    nlog_dsea_res, sigs={}, ax=None, 
+    colors={}, offsets={}, legend_kwargs={}
+):
+    """
+    Plots the dSEA results
+
+    Parameters
+    ---------
+    nlog_dsea_res: (pd.Series)
+    sigs: (dict)
+        significant indicators of 'pos' and 'neg' sets
+    ax: (matplotlib.axes.Axes)
+    colors: (dict)
+        colors for 'Positive' and 'Negative' sets
+    offsets: (dict)
+        offsets for significance indicators
+    legend_kwargs: (dict)
+        kwargs for legend
+
+    Returns
+    -------
+    ax: (matplotlib.axes.Axes)
+    """
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8.5, 2))
+    plot_data = nlog_dsea_res.unstack().unstack().reset_index()
+    sns.barplot(
+        data=plot_data,
+        x="Stage",
+        y=0,
+        hue="level_0",
+        palette=[
+            colors.get('Positive', 'red'), 
+            colors.get('Negative', 'blue')
+        ],
+        saturation=100,
+        alpha=1,
+        ax=ax,
+    )
+    # set default offsets for significance indicators
+    offsets['Positive'] = offsets.get('Positive', -0.2)
+    offsets['Negative'] = offsets.get('Negative', +0.2)
+    # significance indicators
+    for k in ['Positive', 'Negative']:
+        curr_nlog_dsea_res = nlog_dsea_res.loc[slice(None), k]
+        # get provided significant indicators (e.g.
+        # from spin test) and when not provided default
+        # to 10**nlog<0.05
+        sig = sigs.get(
+            k,
+            (10 ** (-curr_nlog_dsea_res)) < 0.05
+        )
+        if any(sig):
+            sig_nlog_dsea_res = curr_nlog_dsea_res.copy()
+            sig_nlog_dsea_res[~sig] = np.NaN
+            ax.scatter(
+                x=np.arange(len(sig_nlog_dsea_res)) + offsets[k],
+                y=sig_nlog_dsea_res + 1,
+                s=10,
+                marker=r"$*$",
+                c=".3",
+            )
+    ax.set_ylabel("-log(p)")
+    ax.set_ylim(ax.get_ylim()[0], ax.get_ylim()[1] + 1)
+    ax.set_xlabel("")
+    ax.set_xticklabels([s.replace(" ", "\n") for s in DSEA_STAGES], fontsize=9)
+    ax.legend(**legend_kwargs)
+    return ax
+
+def dsea_spin(
+    X, parcellation_name, memmap, n_perm=1000,
+    seed=0, mirror='new', n_genes=500, pSI='0.05',
+    fdr=True
+):
+    """
+    Performs spin permutation test on dSEA
+
+    Parameters
+    ---------
+    X: (pd.DataFrame)
+    parcellation_name: (str)
+    memmap: (str)
+        path to memmap file to store null distribution
+    n_perm: (int)
+        Number of spin permutations
+    seed: (int)
+        PLS random seed
+    mirror: {'new', 'old', str}
+        CSEA tool url
+    n_genes: (int)
+        Number of top genes to select
+    pSI: (str)
+        specificity index threshold
+    fdr: (bool)
+        apply FDR correction on p-values
+
+    Returns
+    -------
+    test_res: (pd.Series)
+        test results
+    p_vals: (pd.Series)
+        spin p-values
+    raw_dsea_res: (dict)
+        raw dSEA results
+    top_genes: (list of dict)
+        top genes from PLS with 'pos' and 'neg' weights
+    pls: (sklearn.cross_decomposition.PLSRegression)
+        fitted PLS model
+    """
+    # run dSEA on the true map
+    test_res, raw_dsea_res, top_genes, pls = dsea(
+        X, parcellation_name, 
+        seed=seed, n_genes=n_genes,
+        mirror=mirror, pSI=pSI, fdr=fdr
+    )
+    # create spin surrogates
+    rotated_parcels = get_rotated_parcels(
+        parcellation_name, n_perm, return_indices=False, seed=seed,
+    )
+    # create (or continue) null distribution as a memmap
+    # (given each iteration takes a long time and may fail
+    # due to connection issues, this will prevent waste of
+    # time in case an error occurs during iterations)
+    if os.path.exists(memmap):
+        null_dist = np.memmap(memmap, dtype='float64', mode='r+', shape=(test_res.shape[0], n_perm))
+        # determine starting permutation as number
+        # of permutations in which first row is not NaN
+        start_perm = np.sum(~np.isnan(null_dist[0]))
+        print(f"continuing from permutation {start_perm}")
+    else:
+        null_dist = np.memmap(memmap, dtype='float64', mode='w+', shape=(test_res.shape[0], n_perm))
+        # set all to NaNs which is needed to determine
+        # start_perm in the next retries
+        null_dist[:, :] = np.NaN
+        start_perm = 0 
+    for i in tqdm(range(start_perm, n_perm)):
+        # create surrogate data with rotated parcels
+        surrogate_data = X.loc[rotated_parcels[:, i]]
+        surrogate_data.index = X.index
+        # run dSEA on the surrogate data
+        null_res, _, _, _ = dsea(
+            surrogate_data, parcellation_name, 
+            seed=seed, n_genes=n_genes,
+            mirror=mirror, pSI=pSI, fdr=fdr
+        )
+        null_dist[:, i] = null_res.values
+    # p-value
+    p_vals = (np.abs(null_dist) > np.abs(test_res.values[:, np.newaxis])).mean(axis=1)
+    p_vals = pd.Series(p_vals, index=test_res.index)
+    return test_res, p_vals, raw_dsea_res, top_genes, pls
