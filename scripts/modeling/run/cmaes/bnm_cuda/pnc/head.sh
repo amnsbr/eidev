@@ -63,4 +63,3 @@ fcd_window=10
 lambda=210
 iterMax=81
 time_steps=450000
-SeedSim=410

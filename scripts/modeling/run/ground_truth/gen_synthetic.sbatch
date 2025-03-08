@@ -24,4 +24,4 @@ module load cuda/11.8-nvhpcsdk anaconda/3/2023.03
 
 source ${PROJECT_DIR}/venv/bin/activate
 
-${PROJECT_DIR}/venv/bin/python ./gen_synthetic.py
+${PROJECT_DIR}/venv/bin/python ./gen_synthetic.py "$@"

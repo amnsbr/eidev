@@ -1,26 +1,29 @@
 import os
 import numpy as np
 
-from cubnm import sim, _setup_flags
+from cubnm import sim, _setup_opts
 
 RESULTS_DIR = os.path.dirname(os.path.join(os.environ["PROJECT_DIR"], "results"))
 INPUT_DIR = os.environ["INPUT_DIR"]
 
 # ensure cubnm is installed with the CUBNM_NOISE_WHOLE env variable set to 1
-assert not _setup_flags.noise_segment_flag, (
+assert not _setup_opts.noise_segment_flag, (
     "cubnm must be installed with the CUBNM_NOISE_WHOLE env variable set to 1"
 )
 
 def run():
     """
     Runs a simulation which will be used as a synthetic ground truth
+    to test parameter recovery
     """
     # use micamics group-averaged SC
     sc_path = os.path.join(
         INPUT_DIR, 'micamics', 'SC', 'group-all',
         'ctx_parc-schaefer-100_approach-median_mean001_desc-strength.txt'
     )
-    # set parameters 
+    # set parameters (roughly approximate optimal parameters
+    # of the second age group to ensure parameters are in
+    # a reasonable range)
     param_lists = {}
     param_lists["G"] = np.array([2.5])
     # set wEE and wEI based on maps and known base and coefficients
@@ -63,14 +66,17 @@ def run():
             )
     # run the simulation
     sg = sim.rWWSimGroup(
-            duration=450,
-            TR=3,
-            sc_path=sc_path,
-            bw_params="heinzle2016-3T",
-            out_dir=os.path.join(RESULTS_DIR, "ground_truth", "synthetic"),
-            max_fic_trials=10,
-            rand_seed=410,
-        )
+        duration=450,
+        TR=3,
+        window_size=10,
+        window_step=2,
+        sc=sc_path,
+        bw_params="heinzle2016-3T",
+        exc_interhemispheric=True,
+        out_dir=os.path.join(RESULTS_DIR, "ground_truth", "synthetic"),
+        max_fic_trials=10,
+        rand_seed=410,
+    )
     sg.N = 1
     for param in ["G", "wEE", "wEI"]:
         sg.param_lists[param] = param_lists[param].copy()

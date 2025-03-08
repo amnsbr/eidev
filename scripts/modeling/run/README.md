@@ -43,7 +43,7 @@ These scripts expect `INPUT_DIR`, `BNM_BUILD_PATH`, and `OUTPUT_DIR` in the envi
 Runs the main PNC and IMAGEN CMA-ES using `cubnm` with an equivalent code to the `./bnm_cuda/pnc` and `./bnm_cuda/imagen` main scripts. 
 
 Usage:
-- PNC: `bash ./cmaes/cubnm/run_12x_subs_pnc.sh <n_batches> <sc_level> <fc_level> <parc> <maps_name> <exc_inter> <sc_config> <n_runs> <subsample>`
+- PNC: `bash ./cmaes/cubnm/run_12x_subs_pnc.sh <n_batches> <sc_level> <fc_level> <parc> <maps_name> <exc_inter> <sc_config> <n_runs> <subsample> <noise_seed>`
 - IMAGEN: `bash ./cmaes/cubnm/run_12x_subs_imagen.sh <n_batches> <session> <sc_level> <parc> <exc_inter> <sc_config> <n_runs>`
 
 Note that this code was only used for the following two sensitivity runs on the PNC subsample:
@@ -57,9 +57,5 @@ Using `cubnm` repeat the optimal simulation of each subject with delayed conduct
 ## Rerunning optimal simulations with different simulation seeds or perturbed parameters
 Using `cubnm` repeat the optimal simulation of each subject with i) 50 alternative random seeds used for Gaussian noise generation, or ii) one of the four parameters perturbed by +10% or -10% (this is done for 40 randomly selected subjects). Usage: `python ./sim_seed/run_all.py` and `python ./perturbation/run_all.py`.
 
-
 ## Running the ground truth recovery analysis
-First a synthetic ground truth simulation was run using `sbatch ./ground_truth/gen_synthetic.sbatch`. Then the recovery CMA-ES optimization was run using:
-
-- Same Gaussian noise seed as synthetic simulation: `sbatch ./ground_truth/run_recovery.sbatch 410`
-- Different Gaussian noise seed than synthetic simulation: `sbatch ./ground_truth/run_recovery.sbatch 40`
+First a synthetic ground truth simulation was run using `sbatch ./ground_truth/gen_synthetic.sbatch`. Then the recovery CMA-ES optimizations (using same/different noise seeds listed in `./ground_truth/sim_seeds.txt`) was run using: `bash ./ground_truth/run_12x_recovery.sh`

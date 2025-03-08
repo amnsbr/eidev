@@ -423,6 +423,10 @@ def dsea(
             "neg": top_genes[0]["pos"],
         }
     # run online CSEA tool on the positive and negative lists of genes
+    # Note: FDR is set to False as the FDR corrected p-values reported
+    # by the online tool are corrected across all structures and here
+    # we are interested in the cortex. Cortex p-values are later FDR-
+    # corrected if indicated
     pos_res = fetch_dsea_results(top_genes[0]["pos"], fdr=False, mirror=mirror)
     time.sleep(2)  # to avoid back-to-back requests to the online tool
     neg_res = fetch_dsea_results(top_genes[0]["neg"], fdr=False, mirror=mirror)

@@ -25,6 +25,7 @@ def plot_surface(
     cbar_kwargs={},
     nan_color=(0.85, 0.85, 0.85, 1),
     as_outline=False,
+    embed_nb=True,
     plotter="brainspace",
     **plotter_kwargs,
 ):
@@ -93,11 +94,8 @@ def plot_surface(
     # configurations
     if filename:
         screenshot = True
-        embed_nb = False
-        filename += ".png"
     else:
         screenshot = False
-        embed_nb = True
     if layout_style == "row":
         size = (1600, 400)
         zoom = 1.2
@@ -111,7 +109,9 @@ def plot_surface(
         vrange = (vmin, -vmin)
     if cbar:
         for c in cmap:
-            plot_colorbar(vrange[0], vrange[1], c, **cbar_kwargs)
+            fig = plot_colorbar(vrange[0], vrange[1], c, **cbar_kwargs)
+            if filename:
+                fig.savefig('.'.join(filename.split('.')[:-1])+'_cbar.svg', bbox_inches='tight', pad_inches=0, dpi=1200)
     # create virtual display for plotting in remote servers
     disp = pyvirtualdisplay.Display(visible=False)
     disp.start()

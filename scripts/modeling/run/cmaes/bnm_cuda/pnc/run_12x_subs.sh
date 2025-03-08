@@ -9,6 +9,7 @@ export EXC_INTER=${6:-"true"} # from FC
 export SC_CONFIG=${7:-"mean001"}
 export n_runs_per_subject=${8:-"2"}
 export subsample=${9:-"false"}
+export SeedSim=${10:-"410"}
 
 if [[ "$EXC_INTER" != true ]]; then
     export BNM_EXC_INTERHEM=0
