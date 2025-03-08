@@ -12,7 +12,7 @@ Nvidia GPUs are required to run the simulations and optimizations. The majority 
 The legacy [`bnm_cuda`](https://github.com/amnsbr/bnm_cuda) code is needed to perform the main CMA-ES runs. It can be compiled as shown in `tools/bnm_cuda/example/run_CMAES.sh`. See its build dependencies at [here](https://github.com/amnsbr/bnm_cuda?tab=readme-ov-file#build-dependencies). The compiled program `run_CMAES_gpu` should be placed in the `BNM_BUILD_PATH` environment variable.
 
 #### `cubnm`
-The [`cubnm`](https://github.com/amnsbr/cubnm) was developed with a similar core code as [`bnm_cuda`](https://github.com/amnsbr/bnm_cuda) but with an improved interface and performance. It should be installed from source via `pip install git+https://github.com/amnsbr/cubnm@v0.0.5-eidev`. The requirements for installation from source are listed [here](https://cubnm.readthedocs.io/en/latest/install.html#from-source). Note that to use identical noise arrays as `bnm_cuda` it should be installed after `export CUBNM_NOISE_WHOLE=1`.
+The [`cubnm`](https://github.com/amnsbr/cubnm) was developed with a similar core code as [`bnm_cuda`](https://github.com/amnsbr/bnm_cuda) but with an improved interface and performance. It should be installed from source via `pip install git+https://github.com/amnsbr/cubnm@v0.0.5.post0`. The requirements for installation from source are listed [here](https://cubnm.readthedocs.io/en/latest/install.html#from-source). Note that to use identical noise arrays as `bnm_cuda` it should be installed after `export CUBNM_NOISE_WHOLE=1`.
 
 ## BNM simulation-optimization runs
 
